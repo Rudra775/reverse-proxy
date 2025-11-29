@@ -1,21 +1,11 @@
 {
   "listen_addr": ":8080",
+  "request_timeout_ms": 5000,
   "routes": [
     {
       "path_prefix": "/api",
-      "backends": [
-        "http://localhost:9001",
-        "http://localhost:9002"
-      ],
+      "backends": ["http://localhost:9001", "http://localhost:9002"],
       "strategy": "round_robin"
-    },
-    {
-      "path_prefix": "/static",
-      "backends": [
-        "http://localhost:9003"
-      ],
-      "strategy": "least_conn"
     }
-  ],
-  "request_timeout_ms": 5000
+  ]
 }

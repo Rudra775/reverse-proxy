@@ -3,21 +3,18 @@ package main
 import (
 	"log"
 
-	"proxyserver/internal/config"
-	"proxyserver/internal/proxy"
+	"github.com/Rudra775/reverse-proxy/pkg/proxy"
 )
 
 func main() {
-	cfg, err := config.Load("config.json")
+	cfg, err := proxy.LoadConfig("config.json")
 	if err != nil {
-		log.Fatalf("failed to load config: %v", err)
+		log.Fatalf("config load error: %v", err)
 	}
 
-	router := proxy.NewRouter(cfg)
-	handler := proxy.NewProxyHandler(cfg, router)
-	server := proxy.NewServer(cfg, handler)
+	p := proxy.New(cfg)
 
-	if err := server.Start(); err != nil {
-		log.Fatalf("server error: %v", err)
+	if err := p.Start(); err != nil {
+		log.Fatalf("proxy error: %v", err)
 	}
 }
