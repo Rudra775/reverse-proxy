@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -26,20 +27,28 @@ func (h *coreHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	be.Inc()
 	defer be.Dec()
 
-	req, _ := http.NewRequest(r.Method, be.URL+r.URL.Path, r.Body)
+	backendURL, err := url.Parse(be.URL)
+	if err != nil {
+		http.Error(w, "invalid backend url", http.StatusInternalServerError)
+		return
+	}
+
+	target := backendURL.ResolveReference(r.URL) // merge host+path properly
+	req, _ := http.NewRequest(r.Method, target.String(), r.Body)
 	req.Header = r.Header.Clone()
+	req.Host = backendURL.Host // important fix
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		log.Println("backend error:", err)
-		http.Error(w, "backend error", http.StatusBadGateway)
+		log.Printf("backend error: %v", err)
+		http.Error(w, "backend unavailable", http.StatusBadGateway)
 		return
 	}
 	defer resp.Body.Close()
 
-	for k, v := range resp.Header {
-		for _, vv := range v {
-			w.Header().Add(k, vv)
+	for k, vals := range resp.Header {
+		for _, v := range vals {
+			w.Header().Add(k, v)
 		}
 	}
 
