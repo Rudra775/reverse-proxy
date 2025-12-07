@@ -9,6 +9,7 @@ import (
 type Backend struct {
 	URL         string
 	activeConns int64
+	healthy     int32 // 1 = healthy, 0 = unhealthy
 }
 
 func (b *Backend) Active() int64 {
@@ -21,6 +22,22 @@ func (b *Backend) Dec() {
 	atomic.AddInt64(&b.activeConns, -1)
 }
 
+func (b *Backend) IsHealthy() bool {
+	// default to healthy if never set
+	if atomic.LoadInt32(&b.healthy) == 0 {
+		return true
+	}
+	return atomic.LoadInt32(&b.healthy) == 1
+}
+
+func (b *Backend) SetHealthy(v bool) {
+	if v {
+		atomic.StoreInt32(&b.healthy, 1)
+	} else {
+		atomic.StoreInt32(&b.healthy, -1)
+	}
+}
+
 // ───────────────────────────────────────────
 // Balancer Interface
 
@@ -29,7 +46,7 @@ type Balancer interface {
 }
 
 // ───────────────────────────────────────────
-// Round Robin
+// Round Robin (skips unhealthy backends)
 
 type RoundRobin struct {
 	mu       sync.Mutex
@@ -49,11 +66,19 @@ func (rr *RoundRobin) Next() (*Backend, error) {
 	rr.mu.Lock()
 	defer rr.mu.Unlock()
 
-	if len(rr.backends) == 0 {
+	n := len(rr.backends)
+	if n == 0 {
 		return nil, errors.New("no backends")
 	}
 
-	be := rr.backends[rr.index]
-	rr.index = (rr.index + 1) % len(rr.backends)
-	return be, nil
+	// Try all backends at most once
+	for i := 0; i < n; i++ {
+		idx := (rr.index + i) % n
+		be := rr.backends[idx]
+		if be.IsHealthy() {
+			rr.index = (idx + 1) % n
+			return be, nil
+		}
+	}
+	return nil, errors.New("no healthy backends")
 }
