@@ -9,13 +9,14 @@ import (
 )
 
 type coreHandler struct {
-	router  *Router
-	metrics *Metrics
-	timeout time.Duration
+	router   *Router
+	metrics  *Metrics
+	cache    *LRUCache
+	timeout  time.Duration
+	maxRetry int
 }
 
 func (h *coreHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	h.metrics.Inc()
 	start := time.Now()
 
 	be, err := h.router.Match(r)
